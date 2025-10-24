@@ -10,7 +10,7 @@ class PersonaEmailAliasDA extends DataAccess
                 "isAutoIncrement" => true,
                 "columnType" => "INTEGER"
             ]),
-            new GTKColumnMapping($this, "person_id", [
+            new GTKColumnMapping($this, "user_id", [
                 "isForeignKey" => true,
                 "referencesTable" => "persons",
                 "columnType" => "INTEGER"
@@ -58,7 +58,7 @@ class PersonaEmailAliasDA extends DataAccess
         }
         
         $emailAlias = [
-            "person_id" => $personId,
+            "user_id" => $personId,
             "email" => $email,
             "is_primary" => $isPrimary ? 1 : 0,
             "created_at" => date("Y-m-d H:i:s")
@@ -75,7 +75,7 @@ class PersonaEmailAliasDA extends DataAccess
     public function unsetPrimaryEmailsForPerson($personId)
     {
         $query = new SelectQuery($this);
-        $query->where("person_id", "=", $personId);
+        $query->where("user_id", "=", $personId);
         $query->where("is_primary", "=", 1);
         $primaryEmails = $query->executeAndReturnAll();
         
@@ -94,7 +94,7 @@ class PersonaEmailAliasDA extends DataAccess
     public function getEmailsForPerson($personId)
     {
         $query = new SelectQuery($this);
-        $query->where("person_id", "=", $personId);
+        $query->where("user_id", "=", $personId);
         return $query->executeAndReturnAll();
     }
     
@@ -107,7 +107,7 @@ class PersonaEmailAliasDA extends DataAccess
     public function getPrimaryEmailForPerson($personId)
     {
         $query = new SelectQuery($this);
-        $query->where("person_id", "=", $personId);
+        $query->where("user_id", "=", $personId);
         $query->where("is_primary", "=", 1);
         $primaryEmail = $query->executeAndReturnOne();
         
@@ -130,7 +130,7 @@ class PersonaEmailAliasDA extends DataAccess
         $emailAlias = $this->getOne("email", $email);
         
         if ($emailAlias) {
-            return $emailAlias["person_id"];
+            return $emailAlias["user_id"];
         }
         
         return null;
