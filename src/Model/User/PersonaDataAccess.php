@@ -859,57 +859,26 @@ class PersonaDataAccess extends DataAccess
 			error_log("`userIsInGroup` - ".print_r($user, true));
 		}
 
-		$roleRelations = null;
-
-		if (!isset($user["role_person_relationships"]))
+		// Usar el sistema de caché unificado
+		if (!isset($user["gtk_cache"]["role_names"]))
 		{
-			if ($debug)
-			{
-				error_log("Searching for roles...");
-			}
-			$user["role_person_relationships"] = DataAccessManager::get("role_person_relationships")->where("user_id", $this->valueForKey("id", $user));
-		}
-
-		$roleRelations = $user["role_person_relationships"];
-
-		if ($debug)
-		{
-			error_log("Got roles...: ".print_r($roleRelations, true));
-		}
-
-		$userRoles = null;
-
-		if (!isset($user["roles"]))
-		{
-			$roleIDS = [];
-
-			foreach ($roleRelations as $roleRelation)
-			{
-				$roleIDS[] = $roleRelation["role_id"];
-			}
-
-			$query = new SelectQuery(DataAccessManager::get("roles"));
-
-			$query->addClause(new WhereClause(
-				"id", "IN", $roleIDS
-			));
-
-			$user["roles"] = $query->executeAndReturnAll();
-		}
-
-		$userRoles = $user["roles"]; 
-
-		$userRoleNames = [];
-
-		if (!isset($user["userRoleNames"]))
-		{
+			// Obtener roles usando el sistema de caché unificado
+			$userRoles = DataAccessManager::get("role_person_relationships")->rolesForUser($user);
+			
+			$userRoleNames = [];
 			foreach ($userRoles as $role)
 			{
 				$userRoleNames[] = $role["name"];
 			}
-			$user["userRoleNames"] = $userRoleNames;
+			
+			if (!isset($user["gtk_cache"]))
+			{
+				$user["gtk_cache"] = [];
+			}
+			$user["gtk_cache"]["role_names"] = $userRoleNames;
 		}
-		$userRoleNames = $user["userRoleNames"];
+
+		$userRoleNames = $user["gtk_cache"]["role_names"];
 
 		if ($debug)
 		{
@@ -1011,13 +980,23 @@ class PersonaDataAccess extends DataAccess
 
 	}
 
-	public function permissionsForUser($user)
+	public function permissionsForUser(&$user)
 {
     $debug = false;
     
     if (!$user)
 	{
         return ["public",];
+    }
+
+    // Usar caché unificado para permisos
+    if (isset($user["gtk_cache"]["permissions"]))
+    {
+        if ($debug)
+        {
+            gtk_log("Returning cached permissions for user");
+        }
+        return $user["gtk_cache"]["permissions"];
     }
 
     $roles = DataAccessManager::get("role_person_relationships")->rolesForUser($user);
@@ -1038,6 +1017,13 @@ class PersonaDataAccess extends DataAccess
 
     $permissions = array_unique($permissions);
     sort($permissions);
+
+    // Guardar en caché unificado
+    if (!isset($user["gtk_cache"]))
+    {
+        $user["gtk_cache"] = [];
+    }
+    $user["gtk_cache"]["permissions"] = $permissions;
 
     return $permissions;
 }

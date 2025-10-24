@@ -213,9 +213,290 @@ class SessionDataAccess extends DataAccess
 
 	public function getUserFromSession($session)
 	{
+		$debug = false;
+
 		$user_id = $this->valueForKey("user_id", $session);
+		$cacheTTL = 300; // 5 minutos de TTL
+		
+		// ============================================
+		// NIVEL 1: APCu Cache (Ultra rápido - 0.01-0.1ms)
+		// ============================================
+		$apcu = APCuCacheManager::getInstance();
+		if ($apcu->isEnabled())
+		{
+			$user = $apcu->get("user_data_{$user_id}", $success);
 			
-		return DataAccessManager::get("persona")->getOne("id", $user_id);
+			if ($success)
+			{
+				if ($debug)
+				{
+					error_log("✓ Returning user from APCu cache (ultra fast)");
+				}
+				return $user;
+			}
+		}
+
+		// ============================================
+		// NIVEL 2: Session Cache (Rápido - 1-5ms)
+		// ============================================
+		if (session_status() === PHP_SESSION_NONE) {
+			session_start();
+		}
+
+		$sessionKey = "user_cache_{$user_id}";
+		
+		if (isset($_SESSION[$sessionKey]) && isset($_SESSION[$sessionKey]['timestamp']))
+		{
+			$cacheAge = time() - $_SESSION[$sessionKey]['timestamp'];
+			
+			if ($cacheAge < $cacheTTL)
+			{
+				$user = $_SESSION[$sessionKey]['user'];
+				
+				// Subir a APCu para próxima vez
+				if ($apcu->isEnabled())
+				{
+					$apcu->set("user_data_{$user_id}", $user, $cacheTTL - $cacheAge);
+				}
+				
+				if ($debug)
+				{
+					error_log("✓ Returning user from session cache (age: {$cacheAge}s, promoted to APCu)");
+				}
+				
+				return $user;
+			}
+			else
+			{
+				if ($debug)
+				{
+					error_log("Session cache expired (age: {$cacheAge}s), refreshing...");
+				}
+			}
+		}
+
+		// ============================================
+		// NIVEL 3: Database (Lento - 500-1000ms)
+		// ============================================
+		$user = DataAccessManager::get("persona")->getOne("id", $user_id);
+
+		if ($user)
+		{
+			// Pre-cargar todos los datos necesarios para cachear
+			$this->preloadUserData($user);
+
+			// Guardar en ambos cachés
+			// 1. APCu (compartido, ultra rápido)
+			if ($apcu->isEnabled())
+			{
+				$apcu->set("user_data_{$user_id}", $user, $cacheTTL);
+			}
+
+			// 2. Sesión (fallback)
+			$_SESSION[$sessionKey] = [
+				'user' => $user,
+				'timestamp' => time()
+			];
+
+			if ($debug)
+			{
+				error_log("✓ User loaded from database, cached in APCu + Session");
+			}
+		}
+
+		return $user;
+	}
+
+	/**
+	 * Pre-carga todos los datos del usuario para minimizar consultas posteriores
+	 */
+	private function preloadUserData(&$user)
+	{
+		$debug = false;
+
+		if (!$user || !is_array($user))
+		{
+			return;
+		}
+
+		if ($debug)
+		{
+			error_log("Pre-loading user data for caching...");
+		}
+
+		// Pre-cargar role relations
+		DataAccessManager::get("role_person_relationships")->roleRelationsForUser($user);
+		
+		// Pre-cargar roles (esto también usará el caché de role_relations)
+		DataAccessManager::get("role_person_relationships")->rolesForUser($user);
+		
+		// Pre-cargar role names para isInGroups
+		DataAccessManager::get("persona")->isInGroups($user, []); // Esto inicializa el caché de nombres
+		
+		// Pre-cargar permisos
+		DataAccessManager::get("persona")->permissionsForUser($user);
+
+		if ($debug)
+		{
+			error_log("User data pre-loaded successfully");
+		}
+	}
+
+	/**
+	 * Invalida el caché del usuario en TODOS los niveles
+	 * Llamar este método cuando se modifiquen roles, permisos o datos del usuario
+	 * 
+	 * @param int|null $user_id ID del usuario (null = usuario actual)
+	 */
+	public function invalidateUserCache($user_id = null)
+	{
+		if ($user_id === null)
+		{
+			$currentUser = $this->getCurrentUser();
+			if ($currentUser)
+			{
+				$user_id = DataAccessManager::get("persona")->valueForKey("id", $currentUser);
+			}
+		}
+
+		if ($user_id)
+		{
+			// Invalidar en APCu
+			$apcu = APCuCacheManager::getInstance();
+			if ($apcu->isEnabled())
+			{
+				$apcu->delete("user_data_{$user_id}");
+			}
+
+			// Invalidar en sesión
+			if (session_status() === PHP_SESSION_NONE) {
+				session_start();
+			}
+			
+			$cacheKey = "user_cache_{$user_id}";
+			unset($_SESSION[$cacheKey]);
+		}
+	}
+
+	/**
+	 * Limpia todos los cachés de usuarios en TODOS los niveles
+	 * Útil para liberar memoria o forzar recarga completa
+	 */
+	public function clearAllUserCaches()
+	{
+		// Limpiar APCu
+		$apcu = APCuCacheManager::getInstance();
+		if ($apcu->isEnabled())
+		{
+			$apcu->deletePattern('user_data_.*');
+		}
+
+		// Limpiar sesión
+		if (session_status() === PHP_SESSION_NONE) {
+			session_start();
+		}
+
+		foreach ($_SESSION as $key => $value)
+		{
+			if (strpos($key, 'user_cache_') === 0)
+			{
+				unset($_SESSION[$key]);
+			}
+		}
+	}
+
+	/**
+	 * Obtiene información del caché actual del usuario en TODOS los niveles
+	 * Útil para debugging y monitoreo
+	 * 
+	 * @return array Array con info del caché de todos los niveles
+	 */
+	public function getUserCacheInfo($user_id = null)
+	{
+		if ($user_id === null)
+		{
+			$currentUser = $this->getCurrentUser();
+			if ($currentUser)
+			{
+				$user_id = DataAccessManager::get("persona")->valueForKey("id", $currentUser);
+			}
+		}
+
+		$info = [
+			'user_id' => $user_id,
+			'apcu' => ['exists' => false, 'enabled' => false],
+			'session' => ['exists' => false],
+			'cache_keys' => []
+		];
+
+		if (!$user_id)
+		{
+			return $info;
+		}
+
+		// Info de APCu
+		$apcu = APCuCacheManager::getInstance();
+		$info['apcu']['enabled'] = $apcu->isEnabled();
+		
+		if ($apcu->isEnabled())
+		{
+			$info['apcu']['exists'] = $apcu->exists("user_data_{$user_id}");
+			if ($info['apcu']['exists'])
+			{
+				$user = $apcu->get("user_data_{$user_id}", $success);
+				if ($success && isset($user['gtk_cache']))
+				{
+					$info['cache_keys'] = array_keys($user['gtk_cache']);
+				}
+			}
+		}
+
+		// Info de sesión
+		if (session_status() === PHP_SESSION_NONE) {
+			session_start();
+		}
+
+		$cacheKey = "user_cache_{$user_id}";
+		if (isset($_SESSION[$cacheKey]))
+		{
+			$cacheAge = time() - $_SESSION[$cacheKey]['timestamp'];
+			$info['session'] = [
+				'exists' => true,
+				'age_seconds' => $cacheAge,
+				'created_at' => date('Y-m-d H:i:s', $_SESSION[$cacheKey]['timestamp']),
+				'has_gtk_cache' => isset($_SESSION[$cacheKey]['user']['gtk_cache'])
+			];
+			
+			if (empty($info['cache_keys']) && isset($_SESSION[$cacheKey]['user']['gtk_cache']))
+			{
+				$info['cache_keys'] = array_keys($_SESSION[$cacheKey]['user']['gtk_cache']);
+			}
+		}
+
+		// Info general de APCu
+		if ($apcu->isEnabled())
+		{
+			$info['apcu_stats'] = $apcu->getStats();
+		}
+
+		return $info;
+	}
+
+	/**
+	 * Obtiene estadísticas globales del sistema de caché
+	 * 
+	 * @return array Estadísticas completas
+	 */
+	public function getCacheStats()
+	{
+		$apcu = APCuCacheManager::getInstance();
+		
+		return [
+			'apcu_enabled' => $apcu->isEnabled(),
+			'apcu_stats' => $apcu->isEnabled() ? $apcu->getStats() : null,
+			'session_active' => session_status() === PHP_SESSION_ACTIVE,
+			'session_id' => session_id()
+		];
 	}
  
 	public function getUserWithApiKey($apiKey)

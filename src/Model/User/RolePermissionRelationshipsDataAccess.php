@@ -31,7 +31,7 @@ class RolePermissionRelationshipsDataAccess extends DataAccess
 		$this->dataMapping = new GTKDataSetMapping($this, $columnMappings);
     }
 
-    public function migrate()
+    /*public function migrate()
     {
         $this->getDB()->query("CREATE TABLE IF NOT EXISTS {$this->tableName()} 
         (role_permission_relationship_id INTEGER PRIMARY KEY,
@@ -40,13 +40,13 @@ class RolePermissionRelationshipsDataAccess extends DataAccess
          comments,
          is_active,
          date_created,
-         date_modified,
+         date_modified
         UNIQUE(role_permission_relationship_id))");
 
         // $this->getDB()->query("ALTER TABLE ".$this->tableName()." ADD COLUMN qualifiers;");
         $this->addColumnIfNotExists("qualifiers");
 
-    }
+    }*/
 
     public function permissionRelationsForRole($role)
     {
@@ -115,6 +115,11 @@ class RolePermissionRelationshipsDataAccess extends DataAccess
         if ($debug)
         {
             gtk_log("Role ID: $roleID");
+        }
+
+        if (!isset($this->cache))
+        {
+            $this->cache = [];
         }
 
         if (isset($this->cache[$roleID]))
@@ -263,5 +268,96 @@ class RolePermissionRelationshipsDataAccess extends DataAccess
         $permissionRelationship = $query->executeAndReturnOne();
 
         return $permissionRelationship;
+    }
+
+    /**
+     * Invalida el caché de permisos para un rol específico
+     */
+    private function invalidateRolePermissionCache($roleID)
+    {
+        if (isset($this->cache[$roleID]))
+        {
+            unset($this->cache[$roleID]);
+        }
+    }
+
+    /**
+     * Invalida cachés de todos los usuarios que tienen un rol específico
+     */
+    private function invalidateUsersWithRole($roleID)
+    {
+        // Obtener todos los usuarios con este rol
+        $query = new SelectQuery(DataAccessManager::get("role_person_relationships"));
+        $query->addWhereClause(new WhereClause("role_id", "=", $roleID));
+        $userRelations = $query->executeAndReturnAll();
+
+        // Invalidar caché de cada usuario
+        foreach ($userRelations as $relation)
+        {
+            if (isset($relation['user_id']))
+            {
+                DataAccessManager::get("session")->invalidateUserCache($relation['user_id']);
+            }
+        }
+    }
+
+    /**
+     * Override del método insert para invalidar caché automáticamente
+     */
+    public function insert(&$input, &$outError = null)
+    {
+        $result = parent::insert($input, $outError);
+        
+        if ($result && isset($input['role_id']))
+        {
+            // Invalidar caché del rol
+            $this->invalidateRolePermissionCache($input['role_id']);
+            // Invalidar caché de todos los usuarios con este rol
+            $this->invalidateUsersWithRole($input['role_id']);
+        }
+        
+        return $result;
+    }
+
+    /**
+     * Override del método update para invalidar caché automáticamente
+     */
+    public function update(&$item, $options = null)
+    {
+        $result = parent::update($item, $options);
+        
+        if ($result && isset($item['role_id']))
+        {
+            // Invalidar caché del rol
+            $this->invalidateRolePermissionCache($item['role_id']);
+            // Invalidar caché de todos los usuarios con este rol
+            $this->invalidateUsersWithRole($item['role_id']);
+        }
+        
+        return $result;
+    }
+
+    /**
+     * Override del método delete para invalidar caché automáticamente
+     */
+    public function delete($item)
+    {
+        $roleID = null;
+        if (is_array($item) && isset($item['role_id']))
+        {
+            $roleID = $item['role_id'];
+        }
+        
+        $result = parent::delete($item);
+        
+        if ($result && $roleID)
+        {
+            // Invalidar caché del rol
+            $this->invalidateRolePermissionCache($roleID);
+            // Invalidar caché de todos los usuarios con este rol
+            $this->invalidateUsersWithRole($roleID);
+        }
+        
+        return $result;
     }
 }

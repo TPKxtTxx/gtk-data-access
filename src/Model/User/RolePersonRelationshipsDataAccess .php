@@ -593,12 +593,22 @@ class RolePersonRelationshipsDataAccess extends DataAccess
         }
     }
   ////////////////////////////////////////////// roles para usuarios 
-  public function rolesForUser($user)
+  public function rolesForUser(&$user)
   {
       $debug = false;
   
       if ($user === null) {
           return [];
+      }
+  
+      // Usar caché unificado
+      if (isset($user["gtk_cache"]["roles"]))
+      {
+          if ($debug)
+          {
+              error_log("Returning cached roles for user");
+          }
+          return $user["gtk_cache"]["roles"];
       }
   
       $roleRelations = $this->roleRelationsForUser($user);
@@ -627,6 +637,13 @@ class RolePersonRelationshipsDataAccess extends DataAccess
       ));
   
       $toReturn = $query->executeAndReturnAll();
+  
+      // Guardar en caché unificado
+      if (!isset($user["gtk_cache"]))
+      {
+          $user["gtk_cache"] = [];
+      }
+      $user["gtk_cache"]["roles"] = $toReturn;
   
       if ($debug)
       {
@@ -666,7 +683,7 @@ class RolePersonRelationshipsDataAccess extends DataAccess
     }
 
 
-    public function isUserInAnyOfTheseRoles($toAllowFrom, $user)
+    public function isUserInAnyOfTheseRoles($toAllowFrom, &$user)
     {
         $debug = false;
 
@@ -732,7 +749,7 @@ class RolePersonRelationshipsDataAccess extends DataAccess
 
     }
 
-    public function roleRelationsForUser($user = null)
+    public function roleRelationsForUser(&$user = null)
     {
 
         $debug = false;
@@ -740,6 +757,21 @@ class RolePersonRelationshipsDataAccess extends DataAccess
         if ($debug)
         {
             error_log("Role Relations for user: ".print_r($user, true));
+        }
+
+        if (!$user)
+        {
+            return [];
+        }
+
+        // Usar el sistema de caché unificado en $user["gtk_cache"]
+        if (is_array($user) && isset($user["gtk_cache"]["role_relations"]))
+        {
+            if ($debug)
+            {
+                error_log("Returning cached role relations");
+            }
+            return $user["gtk_cache"]["role_relations"];
         }
 
         $userID = null;
@@ -752,26 +784,26 @@ class RolePersonRelationshipsDataAccess extends DataAccess
         {
             $userID = $user;
         }
-        else if (!$user)
-        {
-            return [];
-        }
         else
         {
             throw new Exception("Invalid user type: ".gettype($user));
         }
 
-        $toReturn = $this->_cache[$userID] ?? null;
+        $userID = (int) $userID;
+        $query = new SelectQuery($this, null, [
+            new WhereClause("user_id", "=",  $userID),
+        ]);
 
-        if (!$toReturn)
+        $toReturn = $query->executeAndReturnAll();
+    
+        // Guardar en caché unificado si $user es array
+        if (is_array($user))
         {
-            $query = new SelectQuery($this, null, [
-                new WhereClause("user_id", "=",  $userID),
-            ]);
-
-            $toReturn = $query->executeAndReturnAll();
-        
-            // $this->_cache[$userID] = $toReturn;
+            if (!isset($user["gtk_cache"]))
+            {
+                $user["gtk_cache"] = [];
+            }
+            $user["gtk_cache"]["role_relations"] = $toReturn;
         }
 
         if ($debug)
@@ -801,7 +833,64 @@ public function assignRolesToUser($userID, $roles)
         $this->insert($relationship);
     }
 
+    // Invalidar caché del usuario después de modificar roles
+    DataAccessManager::get("session")->invalidateUserCache($userID);
+
     return true;
+}
+
+/**
+ * Override del método insert para invalidar caché automáticamente
+ */
+public function insert(&$input, &$outError = null)
+{
+    $result = parent::insert($input, $outError);
+    
+    if ($result && isset($input['user_id']))
+    {
+        // Invalidar caché del usuario modificado
+        DataAccessManager::get("session")->invalidateUserCache($input['user_id']);
+    }
+    
+    return $result;
+}
+
+/**
+ * Override del método update para invalidar caché automáticamente
+ */
+public function update(&$item, $options = null)
+{
+    $result = parent::update($item, $options);
+    
+    if ($result && isset($item['user_id']))
+    {
+        // Invalidar caché del usuario modificado
+        DataAccessManager::get("session")->invalidateUserCache($item['user_id']);
+    }
+    
+    return $result;
+}
+
+/**
+ * Override del método delete para invalidar caché automáticamente
+ */
+public function delete($item)
+{
+    $user_id = null;
+    if (is_array($item) && isset($item['user_id']))
+    {
+        $user_id = $item['user_id'];
+    }
+    
+    $result = parent::delete($item);
+    
+    if ($result && $user_id)
+    {
+        // Invalidar caché del usuario modificado
+        DataAccessManager::get("session")->invalidateUserCache($user_id);
+    }
+    
+    return $result;
 }
 
 
