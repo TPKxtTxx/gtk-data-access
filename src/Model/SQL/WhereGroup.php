@@ -32,11 +32,6 @@ class WhereGroup implements SQLTextInterface, SQLWhereInterface
         $this->clauses[] = $group;
     }
 
-    public function serializeToQueryParameters(&$queryParameters)
-    {
-        $queryParameters['clauses'][]= serialize($this);
-    }
-
     public function getSQLForSelectQuery($selectQuery, &$params) 
     {
         if (!is_array($this->clauses))
