@@ -628,6 +628,13 @@ class GTKHTMLPage
 		$debug = false;
 
 		$html = null;
+		
+		// Debug: verificar template antes de renderizar (activado temporalmente)
+		$debugRender = true;
+		if ($debugRender) {
+			error_log("DEBUG render - template antes de render: " . ($this->template ?? 'NULL'));
+			error_log("DEBUG render - class: " . get_class($this));
+		}
 
 		$this->setCustomLogFile();
 
@@ -709,7 +716,7 @@ class GTKHTMLPage
 		// die("Will render header");
 		$html .= $this->gtk_renderHeader();
 		// die("Will render body");
-		$html .= $this->gtk_renderBody();
+		$html .= $this->gtk_render();
 		// die("Will render footer");
 		$html .= $this->gtk_renderFooter();
 		
@@ -765,7 +772,14 @@ class GTKHTMLPage
 	{
 		$html = '';
 		foreach ($this->stylesheets as $stylesheet) {
-			$html .= '<link rel="stylesheet" href="' . $stylesheet . '">' . PHP_EOL;
+			// Agregar cache busting si es un archivo local (no CDN)
+			$url = $stylesheet;
+			if (strpos($stylesheet, 'http') !== 0 && strpos($stylesheet, '//') !== 0) {
+				// Es un archivo local, agregar timestamp para evitar cache
+				$separator = strpos($stylesheet, '?') !== false ? '&' : '?';
+				$url = $stylesheet . $separator . 'v=' . time();
+			}
+			$html .= '<link rel="stylesheet" href="' . htmlspecialchars($url) . '">' . PHP_EOL;
 		}
 		return $html;
 	}
@@ -779,10 +793,135 @@ class GTKHTMLPage
 	{
 		$html = '';
 		foreach ($this->scripts as $script) {
-			$html .= '<script src="' . $script . '"></script>' . PHP_EOL;
+			// Agregar cache busting si es un archivo local (no CDN)
+			$url = $script;
+			if (strpos($script, 'http') !== 0 && strpos($script, '//') !== 0) {
+				// Es un archivo local, agregar timestamp para evitar cache
+				$separator = strpos($script, '?') !== false ? '&' : '?';
+				$url = $script . $separator . 'v=' . time();
+			}
+			$html .= '<script src="' . htmlspecialchars($url) . '"></script>' . PHP_EOL;
 		}
 		return $html;
 	}
+// ==========================================================
+// 🌿 Twig Template Engine Support (Opcional y Retrocompatible)
+// ==========================================================
+
+protected ?string $template = null;        // Ruta relativa del template Twig
+protected array $templateVars = [];        // Variables a pasar al template
+protected ?\Twig\Environment $twig = null; // Instancia del motor Twig
+
+public function setTemplate(string $templatePath): void
+{
+    $this->template = $templatePath;
+    // Debug temporal
+    error_log("DEBUG setTemplate - Asignado template: " . $templatePath . " en clase: " . get_class($this));
+}
+
+public function assign(string $key, mixed $value): void
+{
+    $this->templateVars[$key] = $value;
+}
+
+protected function initTwig(): void
+{
+    if ($this->twig !== null) {
+        return;
+    }
+
+    if (!class_exists('\Twig\Environment')) {
+        return; // Twig no está instalado
+    }
+
+    $templateDirs = [];
+
+    // Obtener la clase que está llamando (no GTKHTMLPage, sino la clase hija como GestionAveriasHTMLPage)
+    $reflectionClass = new \ReflectionClass($this);
+    $classFile = $reflectionClass->getFileName();
+    $classDir = dirname($classFile);
+
+    // Buscar templates en el directorio del módulo donde está la clase
+    // Ejemplo: stonewood-lib/src/Taller/Pages/GestionAveriasHTMLPage.php -> stonewood-lib/src/Taller/templates/
+    $moduleTemplates = dirname($classDir) . '/templates';
+    if (is_dir($moduleTemplates)) {
+        $templateDirs[] = realpath($moduleTemplates);
+    }
+
+    // Buscar en src/templates del mismo nivel
+    $srcTemplates = dirname($classDir, 2) . '/templates';
+    if (is_dir($srcTemplates)) {
+        $templateDirs[] = realpath($srcTemplates);
+    }
+
+    // Global desde bbl-data-access
+    if (is_dir(__DIR__ . '/../../templates')) {
+        $templateDirs[] = realpath(__DIR__ . '/../../templates');
+    }
+
+    // Fallback: directorio actual/templates
+    if (empty($templateDirs)) {
+        $templateDirs[] = getcwd() . '/templates';
+    }
+
+    $loader = new \Twig\Loader\FilesystemLoader($templateDirs);
+    $this->twig = new \Twig\Environment($loader, [
+        'cache' => false,
+        'autoescape' => 'html',
+    ]);
+}
+
+	protected function gtk_render(): string
+	{
+		$output = $this->renderMessages();
+
+		// Debug: verificar si template está asignado (activado temporalmente)
+		$debug = true;
+		if ($debug) {
+			error_log("DEBUG gtk_render - template: " . ($this->template ?? 'NULL'));
+			error_log("DEBUG gtk_render - class: " . get_class($this));
+			error_log("DEBUG gtk_render - templateVars count: " . count($this->templateVars));
+		}
+
+    if ($this->template !== null && !empty($this->template)) {
+        $this->initTwig();
+
+        if ($this->twig) {
+            $this->templateVars['currentUser'] = $this->currentUser();
+            $this->templateVars['baseUrl'] = $this->currentURL();
+            // Pasar scripts y stylesheets al contexto de Twig
+            $this->templateVars['stylesheets'] = $this->stylesheets;
+            $this->templateVars['scripts'] = $this->scripts;
+
+            try {
+                return $output . $this->twig->render($this->template, $this->templateVars);
+            } catch (\Twig\Error\LoaderError |
+                     \Twig\Error\RuntimeError |
+                     \Twig\Error\SyntaxError $e) {
+                return $output . "<div style='color:red;'>
+                    Error al renderizar plantilla Twig: {$e->getMessage()}<br>
+                    Template buscado: {$this->template}
+                </div>";
+            }
+        } else {
+            // Si Twig no se inicializó, mostrar mensaje de error
+            return $output . "<div style='color:orange;'>
+                Twig no está disponible o no se pudo inicializar. Template: {$this->template}
+            </div>";
+        }
+    }
+
+    // Fallback clásico
+    if (method_exists($this, 'renderBody')) {
+        $output .= $this->renderBody();
+    } else {
+        $output .= "<h1>No se encontró método renderBody()</h1>";
+        $output .= "<p>Template asignado: " . ($this->template ?? 'NULL') . "</p>";
+        $output .= "<p>Clase: " . get_class($this) . "</p>";
+    }
+
+    return $output;
+}
 
 }
 

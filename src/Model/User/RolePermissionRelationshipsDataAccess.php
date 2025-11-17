@@ -149,7 +149,7 @@ class RolePermissionRelationshipsDataAccess extends DataAccess
             gtk_log("Permission IDs fpr Role (".serialize($role).") - : ".print_r($permissionIDS, true));
         }
 
-        $permissions = DataAccessManager::get('permissions')->getByIdentifier($permissionIDS);    
+        $permissions = DataAccessManager::get('permissions')->getByIdentifier($permissionIDS);   
 
         if ($debug)
         {

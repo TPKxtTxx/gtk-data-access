@@ -46,7 +46,8 @@
     "require": {
         "php": "^8.1",
         "phpmailer/phpmailer": "6.9.1",
-        "gtk/gtk-helpers": "dev-main"
+        "gtk/gtk-helpers": "dev-main",
+        "twig/twig": "^3.0"
     },
     "autloadFilesComment": [
         "Files in `files` are loaded in the order listed"
