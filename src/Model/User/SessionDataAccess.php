@@ -115,10 +115,11 @@ class SessionDataAccess extends DataAccess
 		static $session     = null;
 		static $currentUser = null;
 
-		if ($debug)
-		{
-			error_log("`getCurrentUser` - Checking if current user is set: ".print_r($currentUser,true));
-		}
+		// Log removido para evitar llenar logs innecesariamente
+		// if ($debug)
+		// {
+		// 	error_log("`getCurrentUser` - Checking if current user is set: ".print_r($currentUser,true));
+		// }
 
 		
 		if (!$this->didCheckForCurrentUser)
@@ -127,20 +128,22 @@ class SessionDataAccess extends DataAccess
 
 			$session = $this->getCurrentApacheSession();
 
-			if ($debug)
-			{
-				error_log("`getCurrentUser` - Got session: ".print_r($session, true));	
-			}
+			// Log removido para evitar llenar logs innecesariamente
+			// if ($debug)
+			// {
+			// 	error_log("`getCurrentUser` - Got session: ".print_r($session, true));	
+			// }
 
 			if ($session)
 			{	
 				
 				$currentUser = $this->getUserFromSession($session);
 			
-				if ($debug)
-				{
-					error_log("`getCurrentUser` - Got current user: ".print_r($currentUser, true));
-				}
+			// Log removido para evitar llenar logs innecesariamente
+			// if ($debug)
+			// {
+			// 	error_log("`getCurrentUser` - Got current user: ".print_r($currentUser, true));
+			// }
 			}
 			else
 			{
@@ -153,10 +156,11 @@ class SessionDataAccess extends DataAccess
 			
 		}
 
-		if ($debug)
-		{
-			error_log("`getCurrentUser` - Returning current user: ".print_r($currentUser, true));
-		}
+		// Log removido para evitar llenar logs innecesariamente
+		// if ($debug)
+		// {
+		// 	error_log("`getCurrentUser` - Returning current user: ".print_r($currentUser, true));
+		// }
 
 		return $currentUser;
 	}
@@ -228,10 +232,11 @@ class SessionDataAccess extends DataAccess
 			
 			if ($success)
 			{
-				if ($debug)
-				{
-					error_log("✓ Returning user from APCu cache (ultra fast)");
-				}
+				// Log removido para evitar llenar logs innecesariamente
+				// if ($debug)
+				// {
+				// 	error_log("✓ Returning user from APCu cache (ultra fast)");
+				// }
 				return $user;
 			}
 		}
@@ -259,19 +264,21 @@ class SessionDataAccess extends DataAccess
 					$apcu->set("user_data_{$user_id}", $user, $cacheTTL - $cacheAge);
 				}
 				
-				if ($debug)
-				{
-					error_log("✓ Returning user from session cache (age: {$cacheAge}s, promoted to APCu)");
-				}
+				// Log removido para evitar llenar logs innecesariamente
+				// if ($debug)
+				// {
+				// 	error_log("✓ Returning user from session cache (age: {$cacheAge}s, promoted to APCu)");
+				// }
 				
 				return $user;
 			}
 			else
 			{
-				if ($debug)
-				{
-					error_log("Session cache expired (age: {$cacheAge}s), refreshing...");
-				}
+			// Log removido para evitar llenar logs innecesariamente
+			// if ($debug)
+			// {
+			// 	error_log("Session cache expired (age: {$cacheAge}s), refreshing...");
+			// }
 			}
 		}
 
@@ -298,10 +305,11 @@ class SessionDataAccess extends DataAccess
 				'timestamp' => time()
 			];
 
-			if ($debug)
-			{
-				error_log("✓ User loaded from database, cached in APCu + Session");
-			}
+			// Log removido para evitar llenar logs innecesariamente
+			// if ($debug)
+			// {
+			// 	error_log("✓ User loaded from database, cached in APCu + Session");
+			// }
 		}
 
 		return $user;
@@ -542,7 +550,8 @@ class SessionDataAccess extends DataAccess
 			if ($debug)
 			{
 				error_log("API Key found: ".$apiKey);
-				error_log("User found: ".print_r($user, true));
+				// Log removido para evitar llenar logs innecesariamente
+			// error_log("User found: ".print_r($user, true));
 			}
 
 			$session = [];

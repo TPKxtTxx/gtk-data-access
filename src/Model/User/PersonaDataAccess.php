@@ -151,10 +151,11 @@ class PersonaDataAccess extends DataAccess
 
 		$roles = $flatRoleDataAccess->rolesUserCanAddTo($user);
 
-		if ($debug)
-		{
-			error_log("PersonaDataAccess/addWhereClauseForUser - `rolesUserCanAddTo`".print_r($roles, true));
-		}
+		// Log removido para evitar llenar logs innecesariamente
+		// if ($debug)
+		// {
+		// 	error_log("PersonaDataAccess/addWhereClauseForUser - `rolesUserCanAddTo`".print_r($roles, true));
+		// }
 
 		$hasRoles = $roles && (count($roles) > 0);
 
@@ -165,10 +166,11 @@ class PersonaDataAccess extends DataAccess
 
 		$roleRelations = $flatRoleDataAccess->roleRelationsModifiableByUser($user);
 
-		if ($debug)
-		{
-			error_log("`PersonaDataAccess/addWhereClauseForUser - Role Relations Modifiable By User: ".print_r($roleRelations, true));
-		}
+		// Log removido para evitar llenar logs innecesariamente
+		// if ($debug)
+		// {
+		// 	error_log("`PersonaDataAccess/addWhereClauseForUser - Role Relations Modifiable By User: ".print_r($roleRelations, true));
+		// }
 
 		$userIDS = [];
 
@@ -177,10 +179,11 @@ class PersonaDataAccess extends DataAccess
 			$userIDS = array_merge($userIDS, $flatRoleDataAccess->userIDSForRoleRelationsModifiableByRoleRelation($roleRelation));
 		}
 
-		if ($debug)
-		{
-			error_log("Got User IDS: ".print_r($userIDS, true));
-		}
+		// Log removido para evitar llenar logs innecesariamente
+		// if ($debug)
+		// {
+		// 	error_log("Got User IDS: ".print_r($userIDS, true));
+		// }
 
 		$whereGroup = new WhereGroup("OR");
 
@@ -854,10 +857,11 @@ class PersonaDataAccess extends DataAccess
 			return false;
 		}
 
-		if ($debug)
-		{
-			error_log("`userIsInGroup` - ".print_r($user, true));
-		}
+		// Log removido para evitar llenar logs innecesariamente
+		// if ($debug)
+		// {
+		// 	error_log("`userIsInGroup` - ".print_r($user, true));
+		// }
 
 		// Usar el sistema de caché unificado
 		if (!isset($user["gtk_cache"]["role_names"]))
@@ -880,10 +884,11 @@ class PersonaDataAccess extends DataAccess
 
 		$userRoleNames = $user["gtk_cache"]["role_names"];
 
-		if ($debug)
-		{
-			error_log("Got user role names: ".print_r($userRoleNames, true));
-		}
+		// Log removido para evitar llenar logs innecesariamente
+		// if ($debug)
+		// {
+		// 	error_log("Got user role names: ".print_r($userRoleNames, true));
+		// }
 
 		$intersection = array_intersect($groups, $userRoleNames);
 
@@ -992,10 +997,11 @@ class PersonaDataAccess extends DataAccess
     // Usar caché unificado para permisos
     if (isset($user["gtk_cache"]["permissions"]))
     {
-        if ($debug)
-        {
-            gtk_log("Returning cached permissions for user");
-        }
+        // Log removido para evitar llenar logs innecesariamente
+        // if ($debug)
+        // {
+        //     gtk_log("Returning cached permissions for user");
+        // }
         return $user["gtk_cache"]["permissions"];
     }
 
@@ -1007,10 +1013,11 @@ class PersonaDataAccess extends DataAccess
     {
         $rolePermissions = DataAccessManager::get("role_permission_relationships")->permissionsForRole($role);
 
-        if ($debug)
-        {
-            gtk_log("`permissionsForUser`: - Role (".$role["name"].") - has permissions: ".print_r($rolePermissions, true));
-        }
+        // Log removido para evitar llenar logs innecesariamente
+        // if ($debug)
+        // {
+        //     gtk_log("`permissionsForUser`: - Role (".$role["name"].") - has permissions: ".print_r($rolePermissions, true));
+        // }
 
         $permissions = array_merge($permissions, $rolePermissions);
     }
@@ -1057,10 +1064,11 @@ class PersonaDataAccess extends DataAccess
 
 		$permissions = $this->permissionsForUser($user);
 
-		if ($debug)
-		{
-			gtk_log("User has permissions: ".print_r($permissions, true));
-		}
+		// Log removido para evitar llenar logs innecesariamente
+		// if ($debug)
+		// {
+		// 	gtk_log("User has permissions: ".print_r($permissions, true));
+		// }
 
 		$hasPermission = in_array($permission, $permissions);
 
@@ -1117,10 +1125,11 @@ class PersonaDataAccess extends DataAccess
 
 		$permissions = $this->permissionsForUser($user);
 
-		if ($debug)
-		{
-			gtk_log("User has permissions: ".print_r($permissions, true));
-		}
+		// Log removido para evitar llenar logs innecesariamente
+		// if ($debug)
+		// {
+		// 	gtk_log("User has permissions: ".print_r($permissions, true));
+		// }
 
 		$hasPermission = in_array($permission, $permissions);
 
@@ -1232,10 +1241,11 @@ class PersonaDataAccess extends DataAccess
 			$user = $this->getOne("id", $cedulaOrUsername);
 		}
 
-		if ($debug)
-		{
-			error_log("Found user by identifiable: ".print_r($user, true));
-		}
+		// Log removido para evitar llenar logs innecesariamente
+		// if ($debug)
+		// {
+		// 	error_log("Found user by identifiable: ".print_r($user, true));
+		// }
 
 		return $user;
 	}

@@ -604,10 +604,11 @@ class RolePersonRelationshipsDataAccess extends DataAccess
       // Usar caché unificado
       if (isset($user["gtk_cache"]["roles"]))
       {
-          if ($debug)
-          {
-              error_log("Returning cached roles for user");
-          }
+          // Log removido para evitar llenar logs innecesariamente
+          // if ($debug)
+          // {
+          //     error_log("Returning cached roles for user");
+          // }
           return $user["gtk_cache"]["roles"];
       }
   
@@ -754,10 +755,11 @@ class RolePersonRelationshipsDataAccess extends DataAccess
 
         $debug = false;
 
-        if ($debug)
-        {
-            error_log("Role Relations for user: ".print_r($user, true));
-        }
+        // Log removido para evitar llenar logs innecesariamente
+        // if ($debug)
+        // {
+        //     error_log("Role Relations for user: ".print_r($user, true));
+        // }
 
         if (!$user)
         {
@@ -767,10 +769,11 @@ class RolePersonRelationshipsDataAccess extends DataAccess
         // Usar el sistema de caché unificado en $user["gtk_cache"]
         if (is_array($user) && isset($user["gtk_cache"]["role_relations"]))
         {
-            if ($debug)
-            {
-                error_log("Returning cached role relations");
-            }
+            // Log removido para evitar llenar logs innecesariamente
+            // if ($debug)
+            // {
+            //     error_log("Returning cached role relations");
+            // }
             return $user["gtk_cache"]["role_relations"];
         }
 

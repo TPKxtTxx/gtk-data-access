@@ -58,7 +58,7 @@ class GTKMenuItemPair
 
 	public function prepareHeaderItemsForGTKMenuPrepObject($menuPrepObject)
 	{
-		$debug = true;
+		$debug = false;
 
 		if ($debug)
 		{
@@ -94,7 +94,7 @@ class GTKMenuItemPair
 
     public function hasPermission($user) 
     {
-		$debug = true;
+		$debug = false;
 
 		if ($debug)
 		{

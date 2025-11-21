@@ -3764,7 +3764,7 @@ abstract class DataAccess /* implements Serializable */
 
     public function updateWhereKey($item, $whereKey)
     {
-        $debug = false;
+        $debug = true;
 
         $columnNames = array_keys($item);
 
