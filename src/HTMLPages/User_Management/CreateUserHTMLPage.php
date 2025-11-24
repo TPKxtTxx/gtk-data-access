@@ -1,5 +1,6 @@
 <?php
 use PhpOffice\PhpSpreadsheet\IOFactory;
+require_once dirname(__DIR__, 4) . '/stonewood-lib/src/User/StonewoodPersona.php';
 
 class CreateUserHTMLPage extends GTKHTMLPage
 {
@@ -28,7 +29,9 @@ class CreateUserHTMLPage extends GTKHTMLPage
                 'nombres' => $row[1],
                 'apellidos' => $row[2],
                 'email' => $row[3],
-                'password' => $row[4]
+                'password' => $row[4],
+                'tipo_usuario' => !empty($row[6]) ? $row[6] : null,
+                'identificador' => !empty($row[7]) ? $row[7] : null
             ];
             
             // Manejar roles - si no hay roles o está vacío, usar array vacío
@@ -59,7 +62,9 @@ class CreateUserHTMLPage extends GTKHTMLPage
             'nombres' => $user['nombres'],
             'apellidos' => $user['apellidos'],
             'email' => $user['email'],
-            'password' => $user['password']
+            'password' => $user['password'],
+            'tipo_usuario' => $user['tipo_usuario'] ?? null,
+            'identificador' => $user['identificador'] ?? null
         ];
         $roleIds = $user['role_ids'] ?? [];
 
@@ -104,6 +109,9 @@ class CreateUserHTMLPage extends GTKHTMLPage
     {
         $rolesDataAccess = DataAccessManager::get('roles');
         $roles = $rolesDataAccess->selectAll();
+        
+        // Obtener los valores del enum TipoUsuario
+        $tiposUsuario = TipoUsuario::cases();
 
         ob_start(); ?>
 
@@ -286,6 +294,21 @@ class CreateUserHTMLPage extends GTKHTMLPage
                             <input type="password" name="users[0][password]" required>
                         </div>
                         <div class="form-group">
+                            <label for="tipo_usuario">Tipo de Usuario:</label>
+                            <select name="users[0][tipo_usuario]" id="tipo_usuario_0">
+                                <option value="">Seleccione un tipo</option>
+                                <?php foreach ($tiposUsuario as $tipo): ?>
+                                    <option value="<?php echo htmlspecialchars($tipo->value); ?>">
+                                        <?php echo htmlspecialchars(ucfirst($tipo->value)); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="identificador">Identificador:</label>
+                            <input type="text" name="users[0][identificador]" id="identificador_0">
+                        </div>
+                        <div class="form-group">
                             <div class="roles-header">
                                 <div class="roles-title">Roles:</div>
                                 <input type="text" 
@@ -348,6 +371,21 @@ class CreateUserHTMLPage extends GTKHTMLPage
                     <div class="form-group">
                         <label for="password">Contraseña:</label>
                         <input type="password" name="users[${userFormCount}][password]" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="tipo_usuario">Tipo de Usuario:</label>
+                        <select name="users[${userFormCount}][tipo_usuario]" id="tipo_usuario_${userFormCount}">
+                            <option value="">Seleccione un tipo</option>
+                            <?php foreach ($tiposUsuario as $tipo): ?>
+                                <option value="<?php echo htmlspecialchars($tipo->value); ?>">
+                                    <?php echo htmlspecialchars(ucfirst($tipo->value)); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="identificador">Identificador:</label>
+                        <input type="text" name="users[${userFormCount}][identificador]" id="identificador_${userFormCount}">
                     </div>
                     <div class="form-group">
                         <div class="roles-header">
@@ -427,6 +465,22 @@ class CreateUserHTMLPage extends GTKHTMLPage
                             currentForm.querySelector(`input[name="users[${userFormCount - 1}][apellidos]"]`).value = row[2] || '';
                             currentForm.querySelector(`input[name="users[${userFormCount - 1}][email]"]`).value = row[3] || '';
                             currentForm.querySelector(`input[name="users[${userFormCount - 1}][password]"]`).value = row[4] || '';
+                            
+                            // Fill tipo_usuario if it exists
+                            if (row[6]) {
+                                const tipoSelect = currentForm.querySelector(`select[name="users[${userFormCount - 1}][tipo_usuario]"]`);
+                                if (tipoSelect) {
+                                    tipoSelect.value = row[6] || '';
+                                }
+                            }
+                            
+                            // Fill identificador if it exists
+                            if (row[7]) {
+                                const identificadorInput = currentForm.querySelector(`input[name="users[${userFormCount - 1}][identificador]"]`);
+                                if (identificadorInput) {
+                                    identificadorInput.value = row[7] || '';
+                                }
+                            }
                             
                             // Handle roles if they exist
                             if (row[5]) {

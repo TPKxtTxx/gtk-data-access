@@ -324,6 +324,8 @@ class PersonaDataAccess extends DataAccess
 					'inactivo' 	 => ['label'=>'Inactivo'],
 				],
 			]),
+			new GTKColumnMapping($this, "tipo_usuario"),
+			new GTKColumnMapping($this, "identificador"),
 		];
 
 		$this->dataMapping		        = new GTKDataSetMapping($this, $columnMappings);
@@ -782,10 +784,25 @@ class PersonaDataAccess extends DataAccess
 	
 	public function createUser($user)
 	{
+		// Construir la consulta dinámicamente para incluir campos opcionales
+		$columns = ['cedula', 'nombres', 'apellidos', 'email', 'password_hash', 'fecha_creado', 'estado'];
+		$placeholders = [':cedula', ':nombres', ':apellidos', ':email', ':password_hash', ':fecha_creado', ':estado'];
+		
+		// Agregar tipo_usuario e identificador si están presentes
+		if (isset($user["tipo_usuario"]) && !empty($user["tipo_usuario"])) {
+			$columns[] = 'tipo_usuario';
+			$placeholders[] = ':tipo_usuario';
+		}
+		
+		if (isset($user["identificador"]) && !empty($user["identificador"])) {
+			$columns[] = 'identificador';
+			$placeholders[] = ':identificador';
+		}
+		
 		$query = "INSERT INTO {$this->tableName()} 
-			(cedula,  nombres,  apellidos,  email,  password_hash, fecha_creado, estado)
+			(" . implode(', ', $columns) . ")
 			VALUES
-			(:cedula, :nombres, :apellidos, :email, :password_hash, :fecha_creado, 'activo')";
+			(" . implode(', ', $placeholders) . ")";
 			
 		$statement = $this->getDB()->prepare($query);
 
@@ -802,6 +819,16 @@ class PersonaDataAccess extends DataAccess
 		$statement->bindValue(':email', 		$user["email"]);
 		$statement->bindValue(':password_hash', $user["password_hash"]);
 		$statement->bindValue(':fecha_creado',  date(DATE_ATOM) );
+		$statement->bindValue(':estado', 'activo');
+		
+		// Bind tipo_usuario e identificador si están presentes
+		if (isset($user["tipo_usuario"]) && !empty($user["tipo_usuario"])) {
+			$statement->bindValue(':tipo_usuario', $user["tipo_usuario"]);
+		}
+		
+		if (isset($user["identificador"]) && !empty($user["identificador"])) {
+			$statement->bindValue(':identificador', $user["identificador"]);
+		}
 		
 		// Execute the INSERT statement
 		$result = $statement->execute();

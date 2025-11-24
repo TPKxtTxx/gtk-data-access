@@ -131,20 +131,17 @@ class EmailQueueManager extends DataAccess
 
     function verifyEmailString($toCheck) 
     {
-        $emails = null;
+    // Separar por coma
+        $emails = str_contains($toCheck, ",") 
+            ? explode(",", $toCheck) 
+            : [$toCheck];
 
+        foreach ($emails as $email) {
 
-        if (str_contains($toCheck, ","))
-        {
-            $emails = explode(",", $toCheck);
-        }
-        else
-        {
-            $emails = [$toCheck];
-        }
-        
-        foreach ($emails as $email)
-        {
+            // Limpieza mínima (NO Sanitize)
+            $email = trim($email);
+            $email = str_replace(["\r", "\n"], "", $email);
+
             if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
                 return false;
             }
@@ -152,6 +149,7 @@ class EmailQueueManager extends DataAccess
 
         return true;
     }
+
 
     public function addAlertToQueue(
         $sendTo, 
@@ -192,7 +190,13 @@ class EmailQueueManager extends DataAccess
 
         if (is_string($sendTo))
         {
+
             $sendTo = strtolower($sendTo);
+
+            if(strlen($sendTo) < 7)
+            {
+                return false;
+            }
     
             if (!$this->verifyEmailString($sendTo))
             {
@@ -205,6 +209,11 @@ class EmailQueueManager extends DataAccess
 
             foreach ($sendToArray as $email)
             {
+                if(strlen($email) < 7)
+                {
+                    return false;
+                }
+                
                 if (!$this->verifyEmailString($email))
                 {
                     throw new Exception("El campo `sendTo` no es un correo electrónico válido: ".print_r($sendTo, true));
