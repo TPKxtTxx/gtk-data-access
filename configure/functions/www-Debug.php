@@ -345,6 +345,64 @@ function cmdOrCatchAndReport($function, $options = [])
 }
 
 
+function doOrCatchAndReport_resolveUserMessage(Throwable $e, array $options): string
+{
+    $genericMessage = "Ha ocurrido un error en el sistema. El equipo de tecnología ha sido notificado.";
+
+    if (isset($options["error_message_user"]) && $options["error_message_user"] !== "") {
+        return $options["error_message_user"];
+    }
+    if (!empty($options["sanitize_exception_message"])) {
+        return $genericMessage;
+    }
+    $safeClasses = $options["safe_exception_classes"] ?? null;
+    if (is_array($safeClasses) && !empty($safeClasses)) {
+        $exceptionClass = get_class($e);
+        $isSafe = false;
+        foreach ($safeClasses as $safeClass) {
+            if ($exceptionClass === $safeClass || is_subclass_of($e, $safeClass)) {
+                $isSafe = true;
+                break;
+            }
+        }
+        if (!$isSafe) {
+            return $genericMessage;
+        }
+    }
+    $userMessage = trim($e->getMessage());
+    return $userMessage !== "" ? $userMessage : $genericMessage;
+}
+
+function doOrCatchAndReport_renderErrorHtml(string $message, string $reference, bool $supportNotified): string
+{
+    $templatePath = ($_SERVER["DOCUMENT_ROOT"] ?? "") . "/templates/error.html.twig";
+    if (file_exists($templatePath) && class_exists(\Twig\Environment::class)) {
+        try {
+            $loader = new \Twig\Loader\FilesystemLoader(dirname($templatePath));
+            $twig = new \Twig\Environment($loader, ["cache" => false, "autoescape" => "html"]);
+            return $twig->render("error.html.twig", [
+                "message" => $message,
+                "reference" => $reference,
+                "support_notified" => $supportNotified,
+            ]);
+        } catch (Throwable $twigError) {
+            error_log("Failed to render error template: " . $twigError->getMessage());
+        }
+    }
+    $html = "<!DOCTYPE html><html lang=\"es\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1.0\"><title>Error del sistema</title></head>";
+    $html .= "<body style=\"font-family:sans-serif;margin:0;padding:20px;display:flex;justify-content:center;align-items:center;min-height:100vh;\">";
+    $html .= "<div style=\"max-width:500px;text-align:center;\">";
+    $html .= "<h1>Ha ocurrido un error</h1>";
+    $html .= "<p>" . htmlspecialchars($message) . "</p>";
+    if ($supportNotified) {
+        $html .= "<p>El equipo de tecnología ha sido notificado.</p>";
+    }
+    $html .= "<p><strong>Número de referencia:</strong> <code>" . htmlspecialchars($reference) . "</code></p>";
+    $html .= "<p>Por favor, proporcione este número al soporte si necesita asistencia.</p>";
+    $html .= "</div></body></html>";
+    return $html;
+}
+
 function doOrCatchAndReport($function, $options = [])
 {
     $debug = false;
@@ -489,13 +547,20 @@ function doOrCatchAndReport($function, $options = [])
         }
         else
         {
-            $toPrintOnScreenIfError = "";
-            $toPrintOnScreenIfError = "<h1>";
-            $toPrintOnScreenIfError .= "Ha occurido un error en el sistema.";
-            $toPrintOnScreenIfError .= "El equipo de tecnologia ha sido notificado.";
-            $toPrintOnScreenIfError .= "Favor darle este numero: ".$guid;
-            $toPrintOnScreenIfError .= "</h1>";
-            die($toPrintOnScreen);
+            $userMessage = doOrCatchAndReport_resolveUserMessage($e, $options);
+            $supportNotified = !$containsLocal;
+
+            if (!empty($options["response_json"])) {
+                header("Content-Type: application/json; charset=utf-8");
+                die(json_encode([
+                    "error" => true,
+                    "message" => $userMessage,
+                    "reference" => $guid,
+                ]));
+            }
+
+            $toPrintOnScreenIfError = doOrCatchAndReport_renderErrorHtml($userMessage, $guid, $supportNotified);
+            die($toPrintOnScreenIfError);
         }
     }
 }
