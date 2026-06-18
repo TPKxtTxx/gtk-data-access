@@ -292,7 +292,21 @@ class GTKCookie
         // Code should check if the hostname ends in ".local"
         // and if it is, will allow non secure cookies
 
-        $secureCookie = self::authCookieSecureFlag();
+        $secureCookie = true;
+
+        $hostName = $_SERVER['HTTP_HOST'];
+
+        $isSecureConnection = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
+
+        $hostEndsWithLocal = str_ends_with($hostName, '.local');
+        
+        if (!$isSecureConnection)
+        {
+            if ($hostEndsWithLocal)
+            {
+                $secureCookie = false;
+            }
+        }
 
         return $gtkCookie->set("AuthCookie", $value, [
             'expires'   => $expiry,
@@ -310,47 +324,30 @@ class GTKCookie
         
     }
 
-    private static function authCookieSecureFlag(): bool
-    {
-        $hostName = $_SERVER['HTTP_HOST'] ?? '';
-        $isSecureConnection = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
-
-        if (!$isSecureConnection && str_ends_with($hostName, '.local'))
-        {
-            return false;
-        }
-
-        return true;
-    }
-
     public static function clearAuthCookie()
     {
         global $_COOKIE;
+        // Remove the debug die statement
+        // die("Will clear AuthCookie");  // Remove this line
 
+        // First unset from $_COOKIE array
         unset($_COOKIE['AuthCookie']);
 
+        // Create instance to get proper domain settings
         $gtkCookie = new GTKCookie();
-        $expiredOptions = [
-            'expires'  => time() - 3600,
-            'path'     => '/',
+        
+        // Use the set method with empty value and past expiry
+
+        
+
+
+        return $gtkCookie->set('AuthCookie', '', [
+            'expires' => time() - 3600,  // Set to past time
+            'path' => '/',
+            'secure' => true,
             'httponly' => true,
-            'samesite' => self::SAMESITE_STRICT,
-        ];
-
-        $secureFlag = self::authCookieSecureFlag();
-        $gtkCookie->set('AuthCookie', '', array_merge($expiredOptions, [
-            'secure' => $secureFlag,
-        ]));
-
-        // En desarrollo local la cookie pudo haberse creado sin secure.
-        if (!$secureFlag)
-        {
-            $gtkCookie->set('AuthCookie', '', array_merge($expiredOptions, [
-                'secure' => true,
-            ]));
-        }
-
-        return true;
+            'samesite' => 'Strict'
+        ]);
     }
 
     public static function clearAllCookies()
