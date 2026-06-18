@@ -684,6 +684,18 @@ class SessionDataAccess extends DataAccess
 			new GTKColumnMapping($this, "created_at",	    [ "formLabel" => "Created At"]),
 			new GTKColumnMapping($this, "valid_until",   	[ "formLabel" => "Valid Until"]),
 			new GTKColumnMapping($this, "canceled",		[ "formLabel" => "Canceled"]),
+			new GTKColumnMapping($this, "client_ip",		[
+				"formLabel"  => "IP",
+				"columnSize" => 45,
+			]),
+			new GTKColumnMapping($this, "device",			[
+				"formLabel"  => "Dispositivo",
+				"columnSize" => 64,
+			]),
+			new GTKColumnMapping($this, "browser",		[
+				"formLabel"  => "Navegador",
+				"columnSize" => 512,
+			]),
 		];
 
 		$this->dataMapping = new GTKDataSetMapping($this, $columnMappings);
@@ -700,9 +712,89 @@ class SessionDataAccess extends DataAccess
 
 		$this->defaultOrderByColumnKey = "created_at";
 		$this->defaultOrderByOrder  = "DESC";
+	}
 
+	public function resolveClientIp(array $server = null)
+	{
+		$server = $server ?? $_SERVER;
 
-		
+		if (!empty($server["HTTP_CLIENT_IP"]))
+		{
+			return trim($server["HTTP_CLIENT_IP"]);
+		}
+
+		if (!empty($server["HTTP_X_FORWARDED_FOR"]))
+		{
+			$ips = explode(",", $server["HTTP_X_FORWARDED_FOR"]);
+
+			return trim($ips[0]);
+		}
+
+		return $server["REMOTE_ADDR"] ?? null;
+	}
+
+	public function resolveDeviceLabel($userAgent)
+	{
+		$userAgent = strtolower((string) $userAgent);
+
+		if ($userAgent === "")
+		{
+			return "Desconocido";
+		}
+
+		if (preg_match("/ipad|tablet|kindle|playbook/", $userAgent))
+		{
+			return "Tablet";
+		}
+
+		if (preg_match("/mobile|android|iphone|ipod|phone|blackberry|windows phone/", $userAgent))
+		{
+			return "Móvil";
+		}
+
+		return "Escritorio";
+	}
+
+	public function resolveBrowserLabel($userAgent)
+	{
+		$userAgent = (string) $userAgent;
+
+		if ($userAgent === "")
+		{
+			return "Desconocido";
+		}
+
+		$patterns = [
+			"/Edg\/([0-9\.]+)/"        => "Edge",
+			"/OPR\/([0-9\.]+)/"        => "Opera",
+			"/Chrome\/([0-9\.]+)/"     => "Chrome",
+			"/Firefox\/([0-9\.]+)/"   => "Firefox",
+			"/Version\/([0-9\.]+).*Safari/" => "Safari",
+			"/MSIE ([0-9\.]+)/"        => "Internet Explorer",
+			"/Trident\/.*rv:([0-9\.]+)/" => "Internet Explorer",
+		];
+
+		foreach ($patterns as $pattern => $browserName)
+		{
+			if (preg_match($pattern, $userAgent, $matches))
+			{
+				return $browserName." ".$matches[1];
+			}
+		}
+
+		return substr($userAgent, 0, 512);
+	}
+
+	public function resolveLoginClientInfo(array $server = null)
+	{
+		$server = $server ?? $_SERVER;
+		$userAgent = $server["HTTP_USER_AGENT"] ?? "";
+
+		return [
+			"client_ip" => $this->resolveClientIp($server),
+			"device"    => $this->resolveDeviceLabel($userAgent),
+			"browser"   => $this->resolveBrowserLabel($userAgent),
+		];
 	}
 	
 	function guidv4($data = null) {
@@ -721,10 +813,12 @@ class SessionDataAccess extends DataAccess
 	
 	public function newSessionForUser($user)
 	{
+		$clientInfo = $this->resolveLoginClientInfo();
+
 		$query = "INSERT INTO {$this->tableName()} 
-			(session_guid,  user_id, created_at, valid_until,  canceled)
+			(session_guid, user_id, created_at, valid_until, canceled, client_ip, device, browser)
 			VALUES
-			(:session_guid,  :user_id,  :created_at, :valid_until,  :canceled)";
+			(:session_guid, :user_id, :created_at, :valid_until, :canceled, :client_ip, :device, :browser)";
 			
 		$statement = $this->getDB()->prepare($query);
 		
@@ -737,6 +831,9 @@ class SessionDataAccess extends DataAccess
 		$statement->bindValue(':created_at', 		 	date(DATE_ATOM));
 		$statement->bindValue(':valid_until', 			time() + $defaultSessionLength);
 		$statement->bindValue(':canceled', 	  			0);
+		$statement->bindValue(':client_ip', $clientInfo["client_ip"]);
+		$statement->bindValue(':device',    $clientInfo["device"]);
+		$statement->bindValue(':browser',   $clientInfo["browser"]);
 		
 		// Execute the INSERT statement
 		$result = $statement->execute();

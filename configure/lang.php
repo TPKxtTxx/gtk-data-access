@@ -71,6 +71,9 @@ $_GLOBALS["languages"]["es"] = [
     
     "SessionDataAccess/single"                                 => "Sesión",
     "SessionDataAccess/plural"                                 => "Sesiones",
+    "SessionDataAccess/client_ip"                              => "IP",
+    "SessionDataAccess/device"                                 => "Dispositivo",
+    "SessionDataAccess/browser"                                => "Navegador",
 
     "SetPasswordTokenDataAccess/single"                        => "Token de Establecimiento de Contraseña",
     "SetPasswordTokenDataAccess/plural"                        => "Tokens de Establecimiento de Contraseña",
