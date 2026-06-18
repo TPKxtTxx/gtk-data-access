@@ -152,17 +152,29 @@ class GTKDefaultLoginPageDelegate extends GTKHTMLPage
 			error_log("Did get successful match for user: ".print_r($user, true));
 		}
 
-		$sessionGuid = DataAccessManager::get('session')->newSessionForUser($user);
+		$sessionAccessor = DataAccessManager::get('session');
+
+		if (method_exists($sessionAccessor, 'completeLoginForUser'))
+		{
+			$sessionGuid = $sessionAccessor->completeLoginForUser($user);
+		}
+		else
+		{
+			$sessionGuid = $sessionAccessor->newSessionForUser($user);
+		}
 
 		if ($debug)
 		{
 			error_log("Session GUID: ".$sessionGuid);
-			
 		}
-	
+
+		if (!$sessionGuid)
+		{
+			$this->messages[] = "No se pudo iniciar sesión. Intente de nuevo.";
+			return;
+		}
+
 		redirectToPath('/', "Bienvenidos!");
-
-
 		die();
 	}
 }

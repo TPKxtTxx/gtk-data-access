@@ -1084,7 +1084,10 @@ class DataAccessManager
 				"login.php",
 			]))
 			{
-				$loginPage = new GTKDefaultLoginPageDelegate();
+				$loginPageClass = class_exists('StonewoodLoginPageDelegate')
+					? 'StonewoodLoginPageDelegate'
+					: 'GTKDefaultLoginPageDelegate';
+				$loginPage = new $loginPageClass();
 				global $GTK_SUPER_GLOBALS;
 				echo $loginPage->render(...$GTK_SUPER_GLOBALS);
 				return;
